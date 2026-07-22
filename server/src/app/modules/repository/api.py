@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from app.modules.repository.schemas import Envelope, ImportRepositoryRequest
+from app.modules.repository.schemas import Envelope, ImportRepositoryRequest, WorkspaceRepositoryListResponse
 from app.modules.repository.service import (
     CloneFailedError,
     ProviderNotSupportedError,
@@ -48,6 +48,39 @@ def import_repository(payload: ImportRepositoryRequest):
 def list_repositories():
     repos = [service.to_response(repo) for repo in service.list_repositories()]
     return Envelope(data=repos)
+
+
+@router.get("/workspace/{workspace_id}")
+def list_repositories_for_workspace(workspace_id: str):
+    repos = [service.to_response(repo) for repo in service.list_repositories_for_workspace(workspace_id)]
+    return Envelope(data=WorkspaceRepositoryListResponse(workspace_id=workspace_id, repositories=repos).model_dump())
+
+
+@router.post("/{repository_id}/analyze")
+def analyze_repository(repository_id: str):
+    try:
+        analysis = service.analyze_repository(repository_id)
+    except RepositoryNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "REPOSITORY_NOT_FOUND",
+                "message": f"Repository {repository_id} was not found.",
+                "http_status": 404,
+                "retryable": False,
+            },
+        ) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "REPOSITORY_NOT_FOUND",
+                "message": str(exc),
+                "http_status": 404,
+                "retryable": False,
+            },
+        ) from exc
+    return Envelope(data=analysis)
 
 
 @router.get("/{repository_id}")

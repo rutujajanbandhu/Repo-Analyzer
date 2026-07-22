@@ -31,6 +31,23 @@ class DeleteRepositoryResponse(BaseModel):
     status: str
 
 
+class RepositoryAnalysisResponse(BaseModel):
+    repository_id: str
+    status: str
+    summary: dict[str, Any]
+    detected_languages: dict[str, int]
+    frameworks: list[str]
+    entry_points: list[str]
+    top_level_directories: list[str]
+    notable_files: list[str]
+    insights: list[str]
+
+
+class WorkspaceRepositoryListResponse(BaseModel):
+    workspace_id: str
+    repositories: list[RepositoryResponse]
+
+
 class Meta(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     schema_version: str = "1.0"

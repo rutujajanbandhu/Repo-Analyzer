@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.repository.api import service as repository_service
 from app.modules.workspace.schemas import CreateWorkspaceRequest, Envelope
 from app.modules.workspace.service import WorkspaceService
 
@@ -21,3 +22,9 @@ def create_workspace(payload: CreateWorkspaceRequest):
 def list_workspaces():
     workspaces = service.list_workspaces()
     return Envelope(data=[workspace.model_dump() for workspace in workspaces])
+
+
+@router.get("/{workspace_id}/repositories")
+def list_workspace_repositories(workspace_id: str):
+    repos = [repository_service.to_response(repo) for repo in repository_service.list_repositories_for_workspace(workspace_id)]
+    return Envelope(data=repos)

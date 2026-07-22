@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 class Provider(str, Enum):
@@ -44,6 +44,7 @@ class Repository:
         self.file_count: int = 0
         self.total_bytes: int = 0
         self.status: RepositoryStatus = RepositoryStatus.IMPORTING
+        self.analysis: Optional[Dict[str, Any]] = None
         self.created_at: datetime = datetime.now(timezone.utc)
         self.updated_at: datetime = datetime.now(timezone.utc)
 
@@ -90,6 +91,7 @@ class RepositoryStore:
             repo.file_count = repo_data.get("file_count", 0)
             repo.total_bytes = repo_data.get("total_bytes", 0)
             repo.status = RepositoryStatus(repo_data.get("status", RepositoryStatus.IMPORTING.value))
+            repo.analysis = repo_data.get("analysis")
             repo.created_at = datetime.fromisoformat(repo_data["created_at"])
             repo.updated_at = datetime.fromisoformat(repo_data["updated_at"])
             self._data[repo_id] = repo
@@ -108,6 +110,7 @@ class RepositoryStore:
                 "file_count": repo.file_count,
                 "total_bytes": repo.total_bytes,
                 "status": repo.status.value,
+                "analysis": repo.analysis,
                 "created_at": repo.created_at.isoformat(),
                 "updated_at": repo.updated_at.isoformat(),
             }

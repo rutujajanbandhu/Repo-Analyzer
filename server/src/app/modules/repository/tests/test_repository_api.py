@@ -49,6 +49,26 @@ def test_import_repository_endpoint():
     assert Path(stored_repo.storage_path).name == "source"
 
 
+def test_analyze_repository_endpoint():
+    repo_path = _create_local_git_repo()
+    response = client.post(
+        "/v1/repositories",
+        json={
+            "provider": "github",
+            "remote_url": str(repo_path),
+            "workspace_id": "workspace-123",
+        },
+    )
+    repo_id = response.json()["data"]["id"]
+
+    analyze_response = client.post(f"/v1/repositories/{repo_id}/analyze")
+    assert analyze_response.status_code == 200
+    payload = analyze_response.json()["data"]
+    assert payload["repository_id"] == repo_id
+    assert payload["summary"]["total_files"] > 0
+    assert payload["detected_languages"]
+
+
 def test_list_and_get_repository_endpoint():
     response = client.get("/v1/repositories")
     assert response.status_code == 200

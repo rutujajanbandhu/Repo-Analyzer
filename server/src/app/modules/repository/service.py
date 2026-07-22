@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -42,6 +43,9 @@ class RepositoryImportService:
     def list_repositories(self) -> List[Repository]:
         return list(REPOSITORY_STORE.values())
 
+    def list_repositories_for_workspace(self, workspace_id: str) -> List[Repository]:
+        return [repo for repo in REPOSITORY_STORE.values() if repo.workspace_id == workspace_id]
+
     def get_repository(self, repository_id: str) -> Repository:
         repo = REPOSITORY_STORE.get(repository_id)
         if repo is None:
@@ -72,6 +76,132 @@ class RepositoryImportService:
             created_at=repo.created_at.isoformat() + "Z",
             updated_at=repo.updated_at.isoformat() + "Z",
         )
+
+    def analyze_repository(self, repository_id: str) -> dict:
+        repo = self.get_repository(repository_id)
+        if repo.storage_path is None:
+            analysis = {
+                "repository_id": repo.id,
+                "status": repo.status.value,
+                "summary": {"total_files": 0, "total_bytes": 0, "root_directory": None},
+                "detected_languages": {},
+                "frameworks": [],
+                "entry_points": [],
+                "top_level_directories": [],
+                "notable_files": [],
+                "insights": ["No repository content is available yet."],
+            }
+            repo.analysis = analysis
+            REPOSITORY_STORE.set(repo)
+            return analysis
+
+        root = Path(repo.storage_path)
+        if not root.exists():
+            raise FileNotFoundError(f"Repository storage path not found: {repo.storage_path}")
+
+        languages = {}
+        frameworks = set()
+        entry_points = []
+        notable_files = []
+        total_files = 0
+        total_bytes = 0
+        top_level_directories = []
+
+        skip_dirs = {".git", ".hg", ".svn", ".venv", "venv", "env", "node_modules", "dist", "build", "target", "__pycache__", "vendor", ".pytest_cache", ".mypy_cache", ".idea"}
+
+        for current_root, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+            if current_root == str(root):
+                top_level_directories = [d for d in sorted(dirnames) if not d.startswith(".")][:10]
+            for filename in sorted(filenames):
+                if filename.startswith(".") and filename not in {".env.example"}:
+                    continue
+                file_path = Path(current_root) / filename
+                rel_path = file_path.relative_to(root).as_posix()
+                total_files += 1
+                total_bytes += file_path.stat().st_size
+
+                suffix = file_path.suffix.lower()
+                ext_map = {
+                    ".py": "python",
+                    ".js": "javascript",
+                    ".ts": "typescript",
+                    ".tsx": "typescript",
+                    ".jsx": "javascript",
+                    ".go": "go",
+                    ".java": "java",
+                    ".cs": "csharp",
+                    ".rb": "ruby",
+                    ".php": "php",
+                    ".rs": "rust",
+                    ".swift": "swift",
+                    ".kt": "kotlin",
+                    ".scala": "scala",
+                    ".cpp": "cpp",
+                    ".c": "c",
+                    ".h": "c",
+                    ".hpp": "cpp",
+                    ".sh": "shell",
+                    ".ps1": "powershell",
+                    ".sql": "sql",
+                    ".md": "markdown",
+                    ".yml": "yaml",
+                    ".yaml": "yaml",
+                    ".json": "json",
+                    ".toml": "toml",
+                    ".ini": "ini",
+                    ".cfg": "cfg",
+                }
+                if suffix in ext_map:
+                    lang = ext_map[suffix]
+                    languages[lang] = languages.get(lang, 0) + 1
+
+                base_name = filename.lower()
+                if base_name in {"readme.md", "pyproject.toml", "requirements.txt", "package.json", "dockerfile", "docker-compose.yml", "compose.yaml", "setup.py", "manage.py", "main.py", "app.py", "server.py", "index.js", "index.ts", "tsconfig.json", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"}:
+                    notable_files.append(rel_path)
+
+                if base_name in {"main.py", "app.py", "server.py", "manage.py", "index.js", "index.ts", "main.js", "main.ts", "server.ts"} or rel_path.endswith(("/main.py", "/app.py", "/server.py", "/manage.py", "/index.js", "/index.ts", "/main.js", "/main.ts")):
+                    entry_points.append(rel_path)
+
+                if base_name in {"package.json", "pyproject.toml", "requirements.txt", "setup.py", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"}:
+                    try:
+                        text = file_path.read_text(encoding="utf-8", errors="ignore")
+                    except OSError:
+                        text = ""
+                    if base_name == "package.json":
+                        try:
+                            payload = json.loads(text)
+                        except json.JSONDecodeError:
+                            payload = {}
+                        for name in list(payload.get("dependencies", {}).keys()) + list(payload.get("devDependencies", {}).keys()):
+                            if name in {"react", "next", "express", "fastify", "nestjs", "vue"}:
+                                frameworks.add(name)
+                    for token in ["fastapi", "flask", "django", "pytest", "pydantic", "express", "react", "next", "nestjs"]:
+                        if token in text.lower():
+                            frameworks.add(token)
+
+        analysis = {
+            "repository_id": repo.id,
+            "status": repo.status.value,
+            "summary": {
+                "total_files": total_files,
+                "total_bytes": total_bytes,
+                "root_directory": root.name,
+            },
+            "detected_languages": dict(sorted(languages.items())),
+            "frameworks": sorted(frameworks),
+            "entry_points": sorted(entry_points),
+            "top_level_directories": top_level_directories,
+            "notable_files": sorted(notable_files),
+            "insights": [
+                f"Detected {total_files} file(s) and {len(languages)} language family(ies).",
+                f"Entry points: {', '.join(entry_points) if entry_points else 'none detected' }.",
+                f"Framework hints: {', '.join(sorted(frameworks)) if frameworks else 'none detected' }.",
+            ],
+        }
+        repo.analysis = analysis
+        REPOSITORY_STORE.set(repo)
+        return analysis
 
     def _normalize_provider(self, provider: str) -> Provider:
         try:
