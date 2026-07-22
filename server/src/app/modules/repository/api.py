@@ -12,7 +12,6 @@ router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
 service = RepositoryImportService()
 
 
-@router.post("")
 @router.post("/import")
 def import_repository(payload: ImportRepositoryRequest):
     try:
