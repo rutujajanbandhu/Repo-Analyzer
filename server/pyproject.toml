@@ -1,0 +1,87 @@
+[project]
+name = "codecompass-backend"
+version = "0.1.0"
+description = "AI-powered Architecture & Documentation Generator"
+readme = "README.md"
+requires-python = ">=3.12"
+
+dependencies = [
+    # Web
+    "fastapi>=0.116.0",
+    "uvicorn[standard]>=0.35.0",
+
+    # Database
+    "sqlalchemy>=2.0.42",
+    "alembic>=1.16.4",
+    "psycopg[binary]>=3.2.9",
+
+    # Validation
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+
+    # Git
+    "gitpython>=3.1.45",
+
+    # Environment
+    "python-dotenv>=1.1.1",
+
+    # Utilities
+    "orjson>=3.11.1",
+    "python-multipart>=0.0.20",
+    "aiofiles>=24.1.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "uuid6>=2025.0.1"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+    "black>=25.1.0",
+    "ruff>=0.12.5",
+    "isort>=6.0.1",
+    "mypy>=1.17.1",
+    "pre-commit>=4.3.0",
+    "ipython>=9.4.0"
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict = false
+
+# -----------------------------
+# Hatch Configuration
+# -----------------------------
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/pyproject.toml"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
